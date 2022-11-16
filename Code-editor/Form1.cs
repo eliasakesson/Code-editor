@@ -10,11 +10,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Net.WebRequestMethods;
 
 namespace Code_editor
 {
-    public partial class Form1 : Form
+    public partial class Form1 : FormBase
     {
         // Round Corners
         [DllImport("Gdi32.dll", EntryPoint = "CreateRoundRectRgn")]
@@ -33,10 +32,32 @@ namespace Code_editor
         [DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(System.IntPtr hWnd, int wMsg, int wParam, int lParam);
 
+        // Global Variables
+        FileInfo currentFileInfo;
+        DirectoryInfo currentDirectoryInfo;
+        ColorText ct = new ColorText();
+
         public Form1()
         {
             InitializeComponent();
-            Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 10, 10));
+            //Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 10, 10));
+            this.SetStyle(ControlStyles.ResizeRedraw, true);
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.DoubleBuffered = true;
+        }
+
+        private const int cGrip = 16;      // Grip size
+        private const int cCaption = 32;   // Caption bar height;
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            int borderWidth = 2;
+            Color borderColor = Color.Blue;
+            ControlPaint.DrawBorder(e.Graphics, e.ClipRectangle, borderColor,
+              borderWidth, ButtonBorderStyle.Solid, borderColor, borderWidth,
+              ButtonBorderStyle.Solid, borderColor, borderWidth, ButtonBorderStyle.Solid,
+              borderColor, borderWidth, ButtonBorderStyle.Solid);
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -44,13 +65,27 @@ namespace Code_editor
             this.WindowState = FormWindowState.Normal;
         }
 
+        // Title Bar
         private void titleBar_MouseDown(object sender, MouseEventArgs e)
         {
-            ReleaseCapture();
-            SendMessage(this.Handle, 0x112, 0xf012, 0);
+            if (e.Button == MouseButtons.Left && e.Clicks >= 2)
+            {
+                if (this.WindowState == FormWindowState.Normal)
+                {
+                    this.WindowState = FormWindowState.Maximized;
+                }
+                else
+                {
+                    this.WindowState = FormWindowState.Normal;
+                }
+            }
+            else
+            {
+                ReleaseCapture();
+                SendMessage(this.Handle, 0x112, 0xf012, 0);
+            }
         }
 
-        // Title Bar
         private void btnClose_Click(object sender, EventArgs e)
         {
             Application.Exit();
@@ -78,140 +113,87 @@ namespace Code_editor
         {
             lblNotSaved.Visible = true;
 
-            // Get Keywords / Functions
-            string keywords = @"\bpublic|private|partial|static|namespace|class|using|void|foreach|in|new\b";
-            MatchCollection keywordMatches = Regex.Matches(rtbxCode.Text, keywords);
-            Color keywordColor = Color.FromArgb(186, 115, 219);
+            //DisplayLineNumbers();
 
-            // Get Strings
-            string strings = "\".*?\"";
-            MatchCollection stringMatches = Regex.Matches(rtbxCode.Text, strings);
-            Color stringColor = Color.FromArgb(124, 177, 114);
+            ct.ColorCurrentLine(rtbxCode);
+        }
 
-            // Get Comments
-            string comments = @"//.+?$";
-            MatchCollection commentMatches = Regex.Matches(rtbxCode.Text, comments);
-            Color commentColor = Color.FromArgb(100, 100, 100);
+        private void DisplayLineNumbers()
+        {
+            lblLineNumbers.Text = string.Empty;
+            int lineCount = Math.Max(rtbxCode.Lines.Length, 1);
 
-            // Get Data Types
-            string dataTypes = @"\bint|double|float|bool|char|byte|short|long|decimal|sbyte|ushort|uint|ulong\b";
-            MatchCollection dataTypeMatches = Regex.Matches(rtbxCode.Text, dataTypes);
-            Color dataTypeColor = Color.FromArgb(0, 206, 209);
-
-            // Get Numbers
-            string numbers = @"\b(0x)?[0-9]+\b";
-            MatchCollection numberMatches = Regex.Matches(rtbxCode.Text, numbers);
-            Color numberColor = Color.FromArgb(229, 192, 123);
-
-            // Get Operators
-            string operators = @"(\+|\-|\*|\/|\=|\%|\&|\||\^|\~|\!|\?|\<|\>|\:|\;|\,|\.)";
-            MatchCollection operatorMatches = Regex.Matches(rtbxCode.Text, operators);
-            Color operatorColor = Color.FromArgb(225, 225, 225);
-
-            // Get Brackets
-            string brackets = @"(\(|\)|\[|\]|\{|\})";
-            MatchCollection bracketMatches = Regex.Matches(rtbxCode.Text, brackets);
-            Color bracketColor = Color.FromArgb(195, 165, 109);
-
-            int orgIndex = rtbxCode.SelectionStart;
-            int orgLength = rtbxCode.SelectionLength;
-            Color orgColor = Color.White;
-
-            // Set Keywords / Functions Color
-            foreach (Match match in keywordMatches)
+            for (int i = 1; i <= lineCount; i++)
             {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = keywordColor;
-
-                rtbxCode.Select(orgIndex, orgLength);  
-                rtbxCode.SelectionColor = orgColor;
+                lblLineNumbers.Text += i + "\n";
             }
-
-            // Set Strings Color
-            foreach (Match match in stringMatches)
-            {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = stringColor;
-
-                rtbxCode.Select(orgIndex, orgLength);
-                rtbxCode.SelectionColor = orgColor;
-            }
-
-            // Set Comments Color
-            foreach (Match match in commentMatches)
-            {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = commentColor;
-
-                rtbxCode.Select(orgIndex, orgLength);
-                rtbxCode.SelectionColor = orgColor;
-            }
-
-            // Set Data Types Color
-            foreach (Match match in dataTypeMatches)
-            {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = dataTypeColor;
-
-                rtbxCode.Select(orgIndex, orgLength);
-                rtbxCode.SelectionColor = orgColor;
-            }
-
-            // Set Numbers Color
-            foreach (Match match in numberMatches)
-            {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = numberColor;
-
-                rtbxCode.Select(orgIndex, orgLength);
-                rtbxCode.SelectionColor = orgColor;
-            }
-
-            // Set Operators Color
-            foreach (Match match in operatorMatches)
-            {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = operatorColor;
-
-                rtbxCode.Select(orgIndex, orgLength);
-                rtbxCode.SelectionColor = orgColor;
-            }
-
-            // Set Brackets Color
-            foreach (Match match in bracketMatches)
-            {
-                rtbxCode.Select(match.Index, match.Length);
-                rtbxCode.SelectionColor = bracketColor;
-
-                rtbxCode.Select(orgIndex, orgLength);
-                rtbxCode.SelectionColor = orgColor;
-            }
-
-            rtbxCode.Focus();
         }
 
         // Keys
         private void rtbxCode_KeyPress(object sender, KeyPressEventArgs e)
         {
-            if (e.KeyChar == (char)('"')){
+            string selectedText = rtbxCode.SelectedText;
+
+            if (e.KeyChar == '"'){
                 e.Handled = true;
-                rtbxCode.SelectedText = "\"\"";
-                rtbxCode.SelectionStart--;
+                rtbxCode.SelectedText = $"\"{selectedText}\"";
+                if (selectedText.Length <= 0)
+                {
+                    rtbxCode.SelectionStart--;
+                }
             }
-            else if (e.KeyChar == (char)('{')){
+            else if (e.KeyChar == '{'){
                 e.Handled = true;
-                rtbxCode.SelectedText = "{}";
-                rtbxCode.SelectionStart--;
+                rtbxCode.SelectedText = "{" + selectedText + "}";
+                if (selectedText.Length <= 0)
+                {
+                    rtbxCode.SelectionStart--;
+                }
             }
-            else if (e.KeyChar == (char)('(')){
+            else if (e.KeyChar == '('){
                 e.Handled = true;
-                rtbxCode.SelectedText = "()";
-                rtbxCode.SelectionStart--;
+                rtbxCode.SelectedText = $"({selectedText})";
+                if (selectedText.Length <= 0)
+                {
+                    rtbxCode.SelectionStart--;
+                }
             }
-            else if (e.KeyChar == (char)('[')){
+            else if (e.KeyChar == '['){
                 e.Handled = true;
-                rtbxCode.SelectedText = "[]";
-                rtbxCode.SelectionStart--;
+                rtbxCode.SelectedText = $"[{selectedText}]";
+                if (selectedText.Length <= 0)
+                {
+                    rtbxCode.SelectionStart--;
+                }
+            }
+            else if (e.KeyChar == '>')
+            {
+                return;
+                int selectionStart = rtbxCode.SelectionStart;
+                int selectionLength = rtbxCode.SelectionLength;
+
+                int line = rtbxCode.GetLineFromCharIndex(selectionStart);
+                int lineStart = rtbxCode.GetFirstCharIndexFromLine(line);
+
+                int length = selectionStart - lineStart;
+                rtbxCode.Select(lineStart, length);
+
+                string code = rtbxCode.SelectedText;
+                for (int i = code.Length - 1; i >= 0; i--)
+                {
+                    if (code[i] == '<')
+                    {
+                        string content = code.Substring(i + 1, length - i - 1);
+                        rtbxCode.Select(selectionStart, selectionLength);
+                        rtbxCode.SelectedText = $"</{content}>";
+                        break;
+                    } else if (!Char.IsLetter(code[i]))
+                    {
+                        break;
+                    }
+                }
+                
+                rtbxCode.Select(selectionStart, selectionLength);
             }
         }
 
@@ -256,22 +238,25 @@ namespace Code_editor
                 // Auto Layout
                 rtbxCode.Select(rtbxCode.SelectionStart - 1, 2);
 
+                int indentLength = GetLineIndentLength();
+                string indentString = new string(' ', indentLength);
+
                 if (rtbxCode.SelectedText == "{}")
                 {
-                    rtbxCode.SelectedText = "{" + Environment.NewLine + "    " + Environment.NewLine + "}";
-                    rtbxCode.SelectionStart -= 2;
+                    rtbxCode.SelectedText = "{" + Environment.NewLine + indentString + "    " + Environment.NewLine + indentString + "}";
+                    rtbxCode.SelectionStart -= 2 + indentLength;
                 } else if (rtbxCode.SelectedText == "()")
                 {
-                    rtbxCode.SelectedText = "(" + Environment.NewLine + "    " + Environment.NewLine + ")";
-                    rtbxCode.SelectionStart -= 2;
+                    rtbxCode.SelectedText = "(" + Environment.NewLine + indentString + "    " + Environment.NewLine + indentString + ")";
+                    rtbxCode.SelectionStart -= 2 + indentLength;
                 } else if (rtbxCode.SelectedText == "[]")
                 {
-                    rtbxCode.SelectedText = "[" + Environment.NewLine + "    " + Environment.NewLine + "]";
-                    rtbxCode.SelectionStart -= 2;
-                }
-                else
+                    rtbxCode.SelectedText = "[" + Environment.NewLine + indentString + "    " + Environment.NewLine + indentString + "]";
+                    rtbxCode.SelectionStart -= 2 + indentLength;
+                } else
                 {
                     rtbxCode.Select(rtbxCode.SelectionStart + 1, 0);
+                    rtbxCode.SelectedText += Environment.NewLine + indentString;
                 }
             }
             else
@@ -285,6 +270,12 @@ namespace Code_editor
                             Save();
                             break;
                         case Keys.N:
+                            CreateFile();
+                            break;
+                        case Keys.V:
+                            ct.ColorAllText(rtbxCode);
+                            e.Handled = false;
+                            e.SuppressKeyPress = false;
                             break;
                         default:
                             e.Handled = false;
@@ -299,9 +290,35 @@ namespace Code_editor
                 }
             }
         }
+
+        private int GetLineIndentLength()
+        {
+            int lineNr = rtbxCode.GetLineFromCharIndex(rtbxCode.SelectionStart);
+            int lineStart = rtbxCode.GetFirstCharIndexFromLine(lineNr);
+            int lineLength = rtbxCode.Lines[lineNr].Length;
+            int indentLength = 0;
+            for (int i = 0; i < lineLength; i++)
+            {
+                if (rtbxCode.Text[lineStart + i] == ' ')
+                {
+                    indentLength++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return indentLength;
+        }
         
         // Open Folder
         private void openFolderMenuItem_Click(object sender, EventArgs e)
+        {
+            SelectFolder();
+        }
+
+        private void SelectFolder()
         {
             FolderSelectDialog dialog = new FolderSelectDialog
             {
@@ -311,16 +328,30 @@ namespace Code_editor
 
             if (dialog.Show(Handle))
             {
+                DirectoryInfo di = new DirectoryInfo(dialog.FileName);
+                OpenFolder(di);
+            }
+        }
+
+        private void OpenFolder(DirectoryInfo directoryInfo)
+        {
+            if (directoryInfo != null)
+            {
+                flpNoProject.Visible = false;
+                flpProjectButtons.Visible = true;
                 tvwProject.Nodes.Clear();
 
-                foreach (var item in Directory.GetDirectories(dialog.FileName))
+                currentDirectoryInfo = directoryInfo;
+                lblProjectName.Text = currentDirectoryInfo.Name;
+
+                foreach (var item in Directory.GetDirectories(directoryInfo.FullName))
                 {
                     DirectoryInfo di = new DirectoryInfo(item);
                     var node = tvwProject.Nodes.Add(di.Name, di.Name, 0, 1);
                     node.Tag = di;
                 }
 
-                foreach (var item in Directory.GetFiles(dialog.FileName))
+                foreach (var item in Directory.GetFiles(directoryInfo.FullName))
                 {
                     FileInfo fi = new FileInfo(item);
                     var node = tvwProject.Nodes.Add(fi.Name, fi.Name, 2, 2);
@@ -332,9 +363,14 @@ namespace Code_editor
         // Select File
         private void openFileMenuItem_Click(object sender, EventArgs e)
         {
+            SelectFile();
+        }
+
+        private void SelectFile()
+        {
             OpenFileDialog dialog = new OpenFileDialog
             {
-                InitialDirectory = "C:",
+                InitialDirectory = currentDirectoryInfo?.FullName != null ? currentDirectoryInfo.FullName : "C:",
                 Title = "Select a file to open"
             };
 
@@ -349,32 +385,52 @@ namespace Code_editor
         }
 
         // Open File
-        FileInfo currentFileInfo;
         private void OpenFile(FileInfo file)
         {
             currentFileInfo = file;
-            rtbxCode.Text = System.IO.File.ReadAllText(file.FullName);
-            lblFileName.Text = file.Name;
+            tbxFileName.ReadOnly = true;
+            tbxFileName.Text = file.Name;
             pnlFileHeader.Visible = true;
             lblNotSaved.Visible = false;
+            flpNoProject.Visible = false;
+            flpCodeTabs.Visible = true;
+            rtbxCode.Visible = true;
+            rtbxCode.Text = File.ReadAllText(file.FullName);
+            ct.ColorAllText(rtbxCode);
         }
        
         // Close File
         private void btnCloseFile_Click(object sender, EventArgs e)
         {
             currentFileInfo = null;
+            tbxFileName.ReadOnly = false;
             rtbxCode.Text = String.Empty;
-            lblFileName.Text = "code.cs";
+            pnlFileHeader.Visible = false;
             lblNotSaved.Visible = false;
+            flpCodeTabs.Visible = false;
+            rtbxCode.Visible = false;
+            if (currentDirectoryInfo == null)
+            { 
+                flpNoProject.Visible = true;
+            }
         }
 
         // New File
         private void newFileMenuItem_Click(object sender, EventArgs e)
         {
+            CreateFile();
+        }
+
+        private void CreateFile()
+        {
             currentFileInfo = null;
+            tbxFileName.ReadOnly = false;
             rtbxCode.Text = String.Empty;
-            lblFileName.Text = "code.cs";
+            pnlFileHeader.Visible = true;
             lblNotSaved.Visible = false;
+            flpCodeTabs.Visible = true;
+            rtbxCode.Visible = true;
+            tbxFileName.Text = "script.cs";
         }
 
         // Save Code
@@ -387,7 +443,7 @@ namespace Code_editor
         {
             if (!string.IsNullOrEmpty(currentFileInfo?.FullName))
             {
-                System.IO.File.WriteAllText(currentFileInfo.FullName, rtbxCode.Text);
+                File.WriteAllText(currentFileInfo.FullName, rtbxCode.Text);
                 lblNotSaved.Visible = false;
             }
             else
@@ -406,19 +462,16 @@ namespace Code_editor
         {
             SaveFileDialog dialog = new SaveFileDialog
             {
-                InitialDirectory = "C:",
+                InitialDirectory = currentDirectoryInfo?.FullName != null ? currentDirectoryInfo.FullName : "C:",
                 Title = "Select a folder to save file in",
                 DefaultExt = "cs"
             };
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                System.IO.File.WriteAllText($"{dialog.FileName}", rtbxCode.Text);
+                File.WriteAllText($"{dialog.FileName}", rtbxCode.Text);
                 FileInfo file = new FileInfo(dialog.FileName);
                 OpenFile(file);
-
-                var node = tvwProject.Nodes.Add(file.Name, file.Name, 2, 2);
-                node.Tag = file;
             }
         }
 
@@ -434,14 +487,14 @@ namespace Code_editor
                 foreach (var item in Directory.GetDirectories(((DirectoryInfo)e.Node.Tag).FullName))
                 {
                     DirectoryInfo di = new DirectoryInfo(item);
-                    var node = e.Node.Nodes.Add(di.Name, di.Name, 0, 1);
+                    var node = e.Node.Nodes.Add(di.Name, di.Name, 0);
                     node.Tag = di;
                 }
 
                 foreach (var item in Directory.GetFiles(((DirectoryInfo)e.Node.Tag).FullName))
                 {
                     FileInfo fi = new FileInfo(item);
-                    var node = e.Node.Nodes.Add(fi.Name, fi.Name, 2, 2);
+                    var node = e.Node.Nodes.Add(fi.Name, fi.Name, 2);
                     node.Tag = fi;
                 }
 
@@ -453,5 +506,72 @@ namespace Code_editor
             }
         }
 
+        // No Tree Buttons
+        private void btnNoTreeChooseFile_Click(object sender, EventArgs e)
+        {
+            SelectFile();
+        }
+
+        private void btnNoTreeChooseFolder_Click(object sender, EventArgs e)
+        {
+            SelectFolder();
+        }
+
+        private void btnNoTreeNewFile_Click(object sender, EventArgs e)
+        {
+            CreateFile();
+        }
+
+        private void btnAddProjectFile_Click(object sender, EventArgs e)
+        {
+            SaveFileDialog dialog = new SaveFileDialog
+            {
+                InitialDirectory = currentDirectoryInfo?.FullName != null ? currentDirectoryInfo.FullName : "C:",
+                Title = "Select a folder to save file in",
+                DefaultExt = "cs"
+            };
+
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                File.Create(dialog.FileName).Close();
+
+                FileInfo file = new FileInfo(dialog.FileName);
+                OpenFile(file);
+
+                var node = tvwProject.Nodes.Add(file.Name, file.Name, 2, 2);
+                node.Tag = file;
+            }
+        }
+
+        private void btnAddProjectFolder_Click(object sender, EventArgs e)
+        {
+            
+        }
+
+        private void btnProjectToggle_Click(object sender, EventArgs e)
+        {
+            flpProject.Visible = !flpProject.Visible;
+        }
+
+        private void tvwProject_AfterExpand(object sender, TreeViewEventArgs e)
+        {
+            if (e.Node.Tag is DirectoryInfo)
+            {
+                e.Node.ImageIndex = 1;
+            }            
+        }
+
+        private void tvwProject_AfterCollapse(object sender, TreeViewEventArgs e)
+        {
+            if (e.Node.Tag is DirectoryInfo)
+            {
+                e.Node.ImageIndex = 0;
+            }
+        }
+
+        private void tbxFileName_TextChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }
